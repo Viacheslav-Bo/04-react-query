@@ -6,15 +6,48 @@
 // Компонент MovieModal має створювати DOM-елемент наступної структури:
 import css from "./MovieModal.module.css";
 import type { Movie } from "../../types/movie";
+import { useEffect } from "react";
+import { createPortal } from "react-dom";
 
 interface MovieModalProps {
   movie: Movie;
   onClose: () => void;
 }
 
+const modalRoot = document.getElementById("modal-root");
+
 export default function MovieModal({ movie, onClose }: MovieModalProps) {
-  return (
-    <div className={css.backdrop} role="dialog" aria-modal="true">
+  const handleBackdropClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.body.style.overflow = "";
+    };
+  }, [onClose]);
+
+  if (!modalRoot) return null;
+
+  return createPortal(
+    <div
+      className={css.backdrop}
+      role="dialog"
+      aria-modal="true"
+      onClick={handleBackdropClick}
+    >
       <div className={css.modal}>
         <button
           className={css.closeButton}
@@ -39,6 +72,7 @@ export default function MovieModal({ movie, onClose }: MovieModalProps) {
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    modalRoot
   );
 }

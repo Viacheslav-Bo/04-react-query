@@ -33,16 +33,15 @@ export default function App() {
       setOnSelect(null);
       // тут передаєм відповідь аксіоса
       const newMovies = await fetchMovies(query);
-      // setMovies(newMovies);
-      console.log("handleSearch", query, newMovies.results);
-      // записуємо фільми в стейт. нові фільми - це результати відповіді
-      setMovies(newMovies.results);
+
       // перевірка на довжину
-      if (newMovies.results.length === 0) {
+      if (newMovies.length === 0) {
         toast.error("No movies found for your request.");
         setMovies([]);
         return;
       }
+      // записуємо фільми в стейт. нові фільми - це результати відповіді
+      setMovies(newMovies);
     } catch {
       // показуємо помилки якшо є
       setIsError(true);
