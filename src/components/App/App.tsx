@@ -1,56 +1,51 @@
 import SearchBar from "../SearchBar/SearchBar";
 import { fetchMovies } from "../../services/movieService";
-import { useState } from "react";
 import Loader from "../Loader/Loader";
 import toast, { Toaster } from "react-hot-toast";
 import ErrorMessage from "../ErrorMessage/ErrorMessage";
 import MovieGrid from "../MovieGrid/MovieGrid";
 import type { Movie } from "../../types/movie";
 import MovieModal from "../MovieModal/MovieModal";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import ReactPaginate from "react-paginate";
+import css from "./App.module.css";
+import { useEffect, useState } from "react";
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isError, setIsError] = useState(false);
-  const [movies, setMovies] = useState<Movie[]>([]);
-  const [onSelect, setOnSelect] = useState<Movie | null>(null);
+  const [query, setQuery] = useState<string>("");
+  const [selectedMovie, setSelectedMovie] = useState<Movie | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  const handleSearch = async (query: string) => {
-    console.log(query);
-    // перевірка на введення
-    if (!query) {
+  const { data, isLoading, isError } = useQuery({
+    // в ключ передаємо те, шо опрацьовується в ф-ї(query і тд) . типу як залежності
+    queryKey: ["movies", query, currentPage],
+    // треба передати постлання на ф-ю fetchMovies, але оскільки вона приймає шось то передаємо так як нижче
+    queryFn: () => fetchMovies(query, currentPage),
+    enabled: query.trim().length > 0,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+  });
+
+  const handleSearch = (newQuery: string) => {
+    const trimedNewQuery = newQuery.trim();
+    if (!trimedNewQuery) {
       toast.error("Please enter a search query");
       return;
     }
-
-    // пробуємо виконати запити через трай кеч
-    try {
-      // setMovies([])
-      // тут одразу після запиту даємо лоадер
-      setIsLoading(true);
-      // скидаємо помилку
-      setIsError(false);
-      setMovies([]);
-      setOnSelect(null);
-      // тут передаєм відповідь аксіоса
-      const newMovies = await fetchMovies(query);
-
-      // перевірка на довжину
-      if (newMovies.length === 0) {
-        toast.error("No movies found for your request.");
-        setMovies([]);
-        return;
-      }
-      // записуємо фільми в стейт. нові фільми - це результати відповіді
-      setMovies(newMovies);
-    } catch {
-      // показуємо помилки якшо є
-      setIsError(true);
-      toast.error("Something went wrong. Try again.");
-    } finally {
-      // виключаємо лоадер, після того як запит обробився
-      setIsLoading(false);
-    }
+    // коли запит новий — скидаємо
+    setSelectedMovie(null);
+    setCurrentPage(1);
+    setQuery(trimedNewQuery);
   };
+
+  useEffect(() => {
+    if (!query) return;
+
+    if (!isLoading && !isError && data && data.results.length === 0) {
+      toast.error("No movies found for your request.");
+    }
+    // залежності
+  }, [data, isLoading, isError, query]);
 
   return (
     <>
@@ -59,15 +54,36 @@ export default function App() {
 
       {isLoading && <Loader />}
 
-      {isError ? (
-        <ErrorMessage />
-      ) : (
-        movies.length > 0 && (
-          <MovieGrid movies={movies} onSelect={(movie) => setOnSelect(movie)} />
-        )
+      {isError && <ErrorMessage />}
+      {data && data.results.length > 0 && (
+        <MovieGrid
+          movies={data.results}
+          onSelect={(movie) => setSelectedMovie(movie)}
+        />
       )}
-      {onSelect && (
-        <MovieModal movie={onSelect} onClose={() => setOnSelect(null)} />
+
+      {selectedMovie && (
+        <MovieModal
+          movie={selectedMovie}
+          onClose={() => setSelectedMovie(null)}
+        />
+      )}
+
+      {data && data?.total_pages > 1 && (
+        <ReactPaginate
+          pageCount={data?.total_pages ?? 0}
+          pageRangeDisplayed={5}
+          marginPagesDisplayed={1}
+          // selected + 1, бо в лібі починається з 0. просто шоб синхронізувати
+          onPageChange={({ selected }) => setCurrentPage(selected + 1)}
+          // те саме і для -1
+          forcePage={currentPage - 1}
+          containerClassName={css.pagination}
+          activeClassName={css.active}
+          nextLabel="→"
+          previousLabel="←"
+          renderOnZeroPageCount={null}
+        />
       )}
     </>
   );
